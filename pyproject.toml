@@ -1,0 +1,30 @@
+[project]
+name = "training-model"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "aiohttp>=3.13.3",
+    "basicsr>=1.4.2",
+    "bs4>=0.0.2",
+    "lxml>=6.0.2",
+    "numba>=0.63.1",
+    "nvidia-ml-py>=13.590.48",
+    "realesrgan>=0.3.0",
+    "selenium>=4.40.0",
+    "torch>=2.10.0",
+    "torchvision>=0.25.0",
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
