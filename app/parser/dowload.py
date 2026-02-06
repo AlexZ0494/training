@@ -3,21 +3,21 @@ from io import BytesIO
 
 import aiohttp
 from PIL import Image, UnidentifiedImageError
+from app.config import lcolumn, scale
 
 from tqdm import tqdm
 
 
 class ImgDownload:
-    def __init__(self, data: list[str], scale: int):
+    def __init__(self, data: list[str]):
         self.data: list[str] = data
-        self.scale: int = scale
 
     async def download(self, file_path: str):
         pbar = tqdm(
             self.data, ascii=True,
             desc='Dowloading files',
             unit='img',
-            ncols=150,
+            ncols=lcolumn,
             bar_format='{l_bar}{bar}| {elapsed}/{remaining} | {rate_noinv_fmt}'
         )
         async with aiohttp.ClientSession() as session:
@@ -33,7 +33,7 @@ class ImgDownload:
                     try:
                         image = Image.open(file)
                         image.save(f'{file_path}/train_high/img_{indx}.jpg')
-                        low_image = image.resize((image.width // self.scale, image.height // self.scale), Image.NEAREST)
+                        low_image = image.resize((image.width // scale, image.height // scale), Image.NEAREST)
                         low_image.save(f'{file_path}/train_low/img_{indx}.jpg')
                     except UnidentifiedImageError:
                         pass

@@ -2,21 +2,29 @@ import asyncio
 
 import torch
 import torch.nn as nn
+from torch.cuda.amp import autocast, GradScaler
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from app.config import device, lr_dir, hr_dir, download_path, model_dir
-from app.models.residual_block.upscale import UpscaleModel
-from app.parser.forkwallpapers import Parse
+from app.config import device, lr_dir, hr_dir, model_dir, epochs, batch_size, scale
+from app.noise import gaus_noise, NoiseAugmenter
+from app.residual_block.upscale import UpscaleModel
 from app.models.dataset import SRDataset
 from app.utils.consolegui import display_gpu_info, print_center, lcolumn
+from app.parser.wallpaperscraft import Parse
 
 
-def train_model(model, dataloader, criterion, optimizer, epochs: int = 10):
+import os
+
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+
+
+def train_model(model, dataloader, criterion, optimizer):
     model.train()
+    scaler = torch.amp.GradScaler()
     running_loss: float = 0
-    for epoch in range(epochs):
+    for epoch in range(epochs + 1):
         pbar = tqdm(
             dataloader,
             unit='bath',
@@ -29,9 +37,13 @@ def train_model(model, dataloader, criterion, optimizer, epochs: int = 10):
             lr_imgs = lr_imgs.to(device)
             hr_imgs = hr_imgs.to(device)
             optimizer.zero_grad()
-            outputs = model(lr_imgs)
-            loss = criterion(outputs, hr_imgs)
-            loss.backward()
+            with torch.amp.autocast('cuda'):
+                outputs = model(lr_imgs)
+                loss = criterion(outputs, hr_imgs)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            loss.backward(retain_graph=True)
             optimizer.step()
             running_loss += loss.item() * lr_imgs.size(0)
             pbar.set_description(f'| Epoch {epoch + 1}/{epochs} | Loss {running_loss / len(dataloader.dataset):.2f}')
@@ -42,10 +54,9 @@ def train_model(model, dataloader, criterion, optimizer, epochs: int = 10):
 
 
 if __name__ == "__main__":
-    # print("Dowload images for training model")
-    # download_path: str = 'app/models/dataset'
-    # scale = 8
-    # asyncio.run(Parse().download_images(download_path, scale))
+    print_center("Dowload images for training model")
+    download_path: str = 'app/models/dataset'
+    asyncio.run(Parse().download_images(download_path))
     print_center("Run training model")
     display_gpu_info(torch)
 
@@ -55,7 +66,7 @@ if __name__ == "__main__":
     ])
 
     dataset = SRDataset(lr_dir, hr_dir, transform=transform)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     model = UpscaleModel().to(device)
     criterion = nn.MSELoss()

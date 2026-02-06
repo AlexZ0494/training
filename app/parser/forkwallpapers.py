@@ -18,7 +18,7 @@ class Parse:
         items: list[str] = list()
         max_page: int = int(self.soup.select('.pages a')[-2:][0].text)
         pbar = tqdm(
-            range(1, 3),
+            range(1, max_page),
             ascii=True,
             unit='page',
             ncols=150,

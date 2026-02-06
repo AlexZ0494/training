@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from app.config import device
-from app.models.residual_block.resnet import ResidualBlock
+from app.residual_block.resnet import ResidualBlock
 
 
 class UpscaleModel(nn.Module):
