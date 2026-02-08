@@ -17,7 +17,7 @@ class Parse:
         items: list[str] = list()
         max_page: int = int(self.soup.select('.pager__item_last-page a')[0].get('href').replace('/all/3840x2160/page', ''))
         pbar = tqdm(
-            range(1, 30),
+            range(1, 8 + 1),
             ncols=lcolumn,
             ascii=True,
             unit='page',

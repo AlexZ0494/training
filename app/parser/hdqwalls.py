@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from tqdm import tqdm
 
+from app.config import lcolumn
 from app.parser.dowload import ImgDownload
 
 
@@ -23,9 +24,15 @@ class Parse:
     async def download_images(self, file_path: str) -> None:
         items: list[str] = list()
         max_page: int = int(self.soup.select('.pagination a')[-2:][0].text) + 1
-        pbar = tqdm(range(1, max_page), ascii=True, unit='page')
+        pbar = tqdm(
+            range(1, 6 + 1),
+            ncols=lcolumn,
+            ascii=True,
+            unit='page',
+            bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
+            desc=f'| Parsing site {self.url.split('/')[2]}'
+        )
         for i in pbar:
-            pbar.set_description(f"Parsing page '{self.url.replace('page/1', f'page/{i}')}'")
             driver = webdriver.Chrome(options=self.options)
             driver.get(self.url.replace('page/1', f'page/{i}'))
             time.sleep(3)

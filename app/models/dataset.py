@@ -5,28 +5,28 @@ from PIL.ImageFile import ImageFile
 from torch.utils.data import Dataset
 
 from ..noise import NoiseAugmenter
-from ..config import noise_types, prob
 
 
 class SRDataset(Dataset):
-    def __init__(self, lr_dir: str, hr_dir: str, transform=None):
+    def __init__(self, lr_dir: str, hr_dir: str, transform=None, noise_augmenter=None):
         self.lr_dir: str = lr_dir
         self.hr_dir: str = hr_dir
         self.lr_paths: list[str] = sorted(os.listdir(lr_dir))
         self.hr_paths: list[str]= sorted(os.listdir(hr_dir))
         self.transform = transform
+        self.noise_augmenter = noise_augmenter
 
     def __len__(self) -> int:
         return len(self.lr_paths)
 
-    def __getitem__(self, idx) -> tuple[ImageFile, ImageFile]:
+    def __getitem__(self, idx: int) -> tuple[ImageFile, ImageFile]:
         lr_img_path = os.path.join(self.lr_dir, self.lr_paths[idx])
         hr_img_path = os.path.join(self.hr_dir, self.hr_paths[idx])
 
-        lr_image = NoiseAugmenter(
-            noise_types=noise_types,
-            prob=prob
-        ).add_noise(Image.open(lr_img_path).convert('RGB'))
+        if self.noise_augmenter is not None:
+            lr_image = self.noise_augmenter.add_noise(Image.open(lr_img_path).convert('RGB'))
+        else:
+            lr_image = Image.open(lr_img_path).convert('RGB')
         hr_image: ImageFile = Image.open(hr_img_path).convert('RGB')
 
         if self.transform is not None:

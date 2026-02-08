@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from tqdm import tqdm
 
 from app.parser.dowload import ImgDownload
+from app.config import lcolumn
 
 
 class Parse:
@@ -18,10 +19,10 @@ class Parse:
         items: list[str] = list()
         max_page: int = int(self.soup.select('.pages a')[-2:][0].text)
         pbar = tqdm(
-            range(1, max_page),
+            range(1, max_page + 1),
             ascii=True,
             unit='page',
-            ncols=150,
+            ncols=lcolumn,
             bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} | {rate_noinv_fmt}',
             desc='Parsing pages 4kwallpapers'
         )
@@ -40,4 +41,4 @@ class Parse:
                             number = match.group(2)
                             new_link = f'https://4kwallpapers.com/images/wallpapers/{name}-1920x1080-{number}.jpg'
                             items.append(new_link)
-        await ImgDownload(items, scale).download(file_path)
+        await ImgDownload(items).download(file_path)
