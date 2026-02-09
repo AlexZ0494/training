@@ -8,16 +8,16 @@ from app.config import lcolumn
 
 
 class Parse:
-    def __init__(self, url: str = 'https://wallpaperscraft.ru/all/3840x2160'):
+    def __init__(self, url: str = 'https://wallpaperscraft.ru/all/1920x1080'):
         self.url: str = url
         html = requests.get(url).text
         self.soup = BeautifulSoup(html, 'lxml')
 
     async def download_images(self, file_path: str) -> None:
         items: list[str] = list()
-        max_page: int = int(self.soup.select('.pager__item_last-page a')[0].get('href').replace('/all/3840x2160/page', ''))
+        max_page: int = int(self.soup.select('.pager__item_last-page a')[0].get('href').replace('/all/1920x1080/page', ''))
         pbar = tqdm(
-            range(1, 8 + 1),
+            range(1, 2 + 1),
             ncols=lcolumn,
             ascii=True,
             unit='page',
@@ -33,5 +33,5 @@ class Parse:
                 async with session.get(url) as response:
                     page = BeautifulSoup(await response.text(encoding='UTF-8'), 'lxml')
                     for image in page.select('.wallpapers__link img'):
-                        items.append(image.get('src').replace('300x168', '3840x2160'))
+                        items.append(image.get('src').replace('300x168', '1920x1080'))
         await ImgDownload(items).download(file_path)

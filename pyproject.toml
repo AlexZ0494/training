@@ -11,14 +11,26 @@ dependencies = [
   "opencv-python>=4.11.0.86",
   "pytorch-ssim>=0.1",
   "requests>=2.32.5",
-  "scikit-image>=0.26.0",
+  "scikit-image==0.19.3",
   "selenium>=4.40.0",
   "torch",
   "torchvision",
   "tqdm>=4.67.3",
 ]
 
-[tool.uv.sources]
-torch = { path = "torch-2.7.0a0+git3f903c3-cp312-cp312-win_amd64.whl" }
-torchvision = { path = "torchvision-0.22.0+9eb57cd-cp312-cp312-win_amd64.whl" }
+#[tool.uv.sources]
+#torch = { path = "torch-2.7.0a0+git3f903c3-cp312-cp312-win_amd64.whl" }
+#torchvision = { path = "torchvision-0.22.0+9eb57cd-cp312-cp312-win_amd64.whl" }
 
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

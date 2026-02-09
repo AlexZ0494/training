@@ -8,7 +8,7 @@ from ..noise import NoiseAugmenter
 
 
 class SRDataset(Dataset):
-    def __init__(self, lr_dir: str, hr_dir: str, transform=None, noise_augmenter=None):
+    def __init__(self, lr_dir: str, hr_dir: str, transform=None, noise_augmenter=None, prob:float=0.5):
         self.lr_dir: str = lr_dir
         self.hr_dir: str = hr_dir
         self.lr_paths: list[str] = sorted(os.listdir(lr_dir))

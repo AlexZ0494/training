@@ -21,6 +21,7 @@ def pixelated(image: numpy.ndarray, prob: float=0.5)-> numpy.ndarray:
 
     return pixelated_img
 
+
 def gaus_noise(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
     quality: int = int(10 * prob)
     quality = 3 if quality < 3 else 25 if quality > 25 else quality
