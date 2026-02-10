@@ -15,23 +15,6 @@ from app.residual_block.test import enhance_image
 from app.utils.consolegui import print_center
 
 
-def psnr(img1, img2) -> float:
-    mse = torch.mean((img1 - img2) ** 2)
-    max_pixel_value = 1.0
-    return 20 * math.log10(max_pixel_value / math.sqrt(mse))
-
-
-def calculate_ssim(img1, img2) -> float:
-    return ssim_skimage(
-        img1.float().detach().cpu().numpy(),
-        img2.float().detach().cpu().numpy(),
-        multichannel=True,
-        data_range=1.0,
-        win_size=-11,
-        full=True
-    )
-
-
 class TrainModel:
     def __init__(self, model, criterion, optimizer, epochs: int = 100, batch_size: int = 3):
         self.model = model
@@ -70,11 +53,20 @@ class TrainModel:
                 outputs = self.model(lr_imgs)
 
                 # Рассчитываем PSNR
-                psnr_val: float = psnr(outputs, hr_imgs)
+                psnr_val: float = float(20 * math.log10(1.0 / math.sqrt(torch.mean((outputs - hr_imgs) ** 2))))
                 total_psnr += psnr_val
 
                 # Рассчитываем SSIM
-                ssim_val, _ = calculate_ssim(outputs, hr_imgs)
+                try:
+                    ssim_val = ssim_skimage(
+                        outputs.float().detach().cpu().numpy(),
+                        hr_imgs.float().detach().cpu().numpy(),
+                        multichannel=True,
+                        data_range=1.0,
+                        win_size=11
+                    )
+                except:
+                    ssim_val = float('-inf')
                 total_ssim += ssim_val
 
                 count += 1
@@ -95,32 +87,42 @@ class TrainModel:
         self.model.train()
         running_loss: float = 0
         best_psnr = float('-inf')
-        prob: float = 0.5
-        dataloader = None
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
         noise_types: list[str] = [None, 'pixelated', 'gaus', 'quantize', 'salt_paper', 'color_salt_paper']
         noises: list[str] | None = list()
-        for noise in noise_types:
+        for _id, noise in enumerate(noise_types):
+            print_center(f"Add Noise {noise}")
             prob = 0.5
+            self.epochs = 100
             if noise is None:
                 noises = noise
+            elif noise == 'pixelated':
+                self.epochs = 200
             else:
                 noises.append(noise)
+            if _id == len(noise_types):
+                self.epochs = 300
             noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
             dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
             dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-            for self.epoch in range(1, self.epochs + 1):
-                pbar = tqdm(
-                    dataloader,
-                    unit='bath',
-                    ncols=lcolumn,
-                    ascii=True,
-                    bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
-                    desc=f'| {'Noise ' + ', '.join(noises) if noises is not None else 'Not noise'} | Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}'
-                )
+            print(f"Noises: {', '.join(noises)}")
+            pbar = tqdm(
+                dataloader,
+                unit='bath',
+                ncols=lcolumn,
+                ascii=True,
+                bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
+                desc=f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}'
+            )
+            for self.epoch in range(1, self.epochs):
+                if self.epoch % 20 == 0:
+                    prob += 0.3
+                    noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
+                    dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
+                    dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
                 for lr_imgs, hr_imgs in pbar:
                     lr_imgs = lr_imgs.to(device)
                     hr_imgs = hr_imgs.to(device)
@@ -131,16 +133,12 @@ class TrainModel:
                     self.optimizer.step()
                     running_loss += loss.item() * lr_imgs.size(0)
                     pbar.set_description(
-                        f'| {'Noise ' + ', '.join(noises) if noises is not None else 'Not noise'} | Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}')
+                        f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}')
                     del lr_imgs, hr_imgs, loss
                     torch.cuda.empty_cache()
                 # Периодически проверяем качество модели на валидации
-                if self.epoch % 10 == 0 or self.epoch == self.epochs - 1:
+                if self.epoch % 10 == 0 or self.epoch == self.epochs:
                     self.validate_model(dataloader)
-                    prob += 0.025
-                    noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
-                    dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
-                    dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
 
                 # Сохраняем лучшую модель по PSNR
                 if self.avg_psnr > self.best_psnr:
@@ -148,4 +146,10 @@ class TrainModel:
                     self.model.eval()
                     enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
                     torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{best_psnr:.4f}.pth')
+
                 torch.cuda.empty_cache()
+
+                pbar.update()
+                pbar.refresh()
+
+            print("-" * lcolumn)

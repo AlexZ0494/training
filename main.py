@@ -25,15 +25,15 @@ os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 if __name__ == "__main__":
     print_center("Dowload images for training model")
     download_path: str = 'app/models/dataset'
-    asyncio.run(wallpaperscraft().download_images(download_path))
-    asyncio.run(forkwallpapers().download_images(download_path))
-    asyncio.run(akspic().download_images(download_path))
-    torch.cuda.set_device(1)
-    print_center("Run training model")
-    display_gpu_info(torch)
-
-    model = UpscaleModel().to(device)
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
-
-    TrainModel(model, criterion, optimizer).train_model()
+    asyncio.run(wallpaperscraft().download_images())
+    asyncio.run(forkwallpapers().download_images())
+    # asyncio.run(akspic().download_images(download_path))
+    # # torch.cuda.set_device(1)
+    # print_center("Run training model")
+    # display_gpu_info(torch)
+    #
+    # model = UpscaleModel().to(device)
+    # criterion = nn.MSELoss()
+    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
+    #
+    # TrainModel(model, criterion, optimizer).train_model()

@@ -26,7 +26,7 @@ def enhance_image(model, model_name: str) -> None:
         desc=f'| {model_name}'
     )
     os.makedirs(f'{hr_tst_dir}/{model_name}')
-    for lr_path in sorted(os.listdir(lr_tst_dir)):
+    for lr_path in pbar:
         pbar.set_description(f'| {model_name} | {lr_path}')
         input_image = Image.open(os.path.join(lr_tst_dir, lr_path)).convert('RGB')
         input_tensor = transform(input_image).unsqueeze(0)  # Добавляем размер batc-size

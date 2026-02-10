@@ -21,11 +21,11 @@ class Parse:
         self.soup: BeautifulSoup = BeautifulSoup(driver.page_source, 'lxml')
         driver.quit()
 
-    async def download_images(self, file_path: str) -> None:
+    async def download_images(self) -> None:
         items: list[str] = list()
         max_page: int = int(self.soup.select('.pagination a')[-2:][0].text) + 1
         pbar = tqdm(
-            range(1, 6 + 1),
+            range(1, max_page),
             ncols=lcolumn,
             ascii=True,
             unit='page',
@@ -41,4 +41,4 @@ class Parse:
                     item.get('src').replace('wallpapers/thumb', 'download').replace('.jpg', '-1920x1080.jpg')
                 )
             driver.quit()
-        await ImgDownload(items).download(file_path)
+        await ImgDownload(items).download()

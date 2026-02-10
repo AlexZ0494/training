@@ -13,7 +13,7 @@ class Parse:
         options = webdriver.ChromeOptions()
         self.driver = webdriver.Chrome(options=options)
 
-    async def download_images(self, file_path: str) -> None:
+    async def download_images(self) -> None:
         items: list[str] = list()
         soups: list = list()
         self.driver.get(self.url)
@@ -37,4 +37,4 @@ class Parse:
         self.driver.quit()
         for item in soups:
             items.append(item.get('href'))
-        await ImgDownload(items).download(file_path)
+        await ImgDownload(items).download()
