@@ -25,9 +25,9 @@ class TrainModel:
         self.epochs = epochs
         self.epoch: int = 0
         self.avg_psnr: float = 0.0
-        self.best_psnr = float('-inf')
+        self.best_psnr: float = 0.0
 
-    @lru_cache(maxsize=200)  # Используем кэширование для подготовки данных
+    @lru_cache(maxsize=4_000)
     def prepare_data(self, lr_imgs, hr_imgs):
         """Подготовка данных с кэшированием"""
         return lr_imgs.to(device), hr_imgs.to(device)
