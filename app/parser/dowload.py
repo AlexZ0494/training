@@ -49,3 +49,4 @@ class ImgDownload:
             for _ in pool.imap(dwnl, enumerate(self.data)):
                 pbar.update()
                 pbar.refresh()
+        print('-' * lcolumn)

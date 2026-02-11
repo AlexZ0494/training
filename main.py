@@ -31,15 +31,14 @@ if __name__ == "__main__":
     # data.extend(asyncio.run(akspic().download_images))
     # data.extend(wallpaperscraft().download_images)
     # data.extend(forkwallpapers().download_images)
-    data.extend(hdqwalls().download_images)
-    print(len(data))
+    # data.extend(hdqwalls().download_images)
     # ImgDownload(data).download()
-    # # torch.cuda.set_device(1)
-    # print_center("Run training model")
-    # display_gpu_info(torch)
-    #
-    # model = UpscaleModel().to(device)
-    # criterion = nn.MSELoss()
-    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
-    #
-    # TrainModel(model, criterion, optimizer).train_model()
+    torch.cuda.set_device(1)
+    print_center("Run training model")
+    display_gpu_info(torch)
+
+    model = UpscaleModel().to(device)
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
+
+    TrainModel(model, criterion, optimizer).train_model()
