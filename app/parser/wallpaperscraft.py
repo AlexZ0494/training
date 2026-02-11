@@ -1,15 +1,11 @@
 import multiprocessing
-import queue
 import time
 
-import aiohttp
 import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from app.parser.dowload import ImgDownload
 from app.config import lcolumn
-from app.utils.consolegui import print_center
 
 
 def get_url(url: str):
@@ -34,8 +30,8 @@ class Parse:
         self.url: str = url
         html = requests.get(url).text
         self.soup = BeautifulSoup(html, 'lxml')
-
-    async def download_images(self) -> None:
+    @property
+    def download_images(self) -> list[str]:
         """
         Скачивает изображения с сайта, используя многопоточность и прогрессбар.
         :param file_path: путь для сохранения изображений
@@ -55,5 +51,4 @@ class Parse:
                     items.append(item)
                 pbar.update()
                 pbar.refresh()
-
-        await ImgDownload(items).download()
+        return items

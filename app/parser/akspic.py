@@ -1,10 +1,23 @@
+import multiprocessing
 import time
 
+import aiohttp
+import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from tqdm import tqdm
 
-from app.parser.dowload import ImgDownload
+from app.config import lcolumn
+
+
+def get_url(url: str) -> str | None:
+    try:
+        item = BeautifulSoup(requests.get(url).text, 'lxml').select(
+            '.wallpaper__image__desktop img')[0]
+        return item.get('src')
+    except Exception:
+        return None
 
 
 class Parse:
@@ -13,7 +26,8 @@ class Parse:
         options = webdriver.ChromeOptions()
         self.driver = webdriver.Chrome(options=options)
 
-    async def download_images(self) -> None:
+    @property
+    async def download_images(self) -> list[str]:
         items: list[str] = list()
         soups: list = list()
         self.driver.get(self.url)
@@ -26,15 +40,30 @@ class Parse:
                 try:
                     next_page = self.driver.find_element(By.CSS_SELECTOR, ".navigation .grid .grid__col .showmore a")
                     if str(next_page.text).strip() == "Следующая страница":
-                        soups.append(BeautifulSoup(self.driver.page_source, 'lxml').select('.gallery_fluid-column-block'))
+                        for block in BeautifulSoup(self.driver.page_source, 'lxml').select(
+                                '.gallery_fluid-column-block'):
+                            soups.append(block.get('href'))
                         next_page.click()
                         time.sleep(3)
                 except:
-                    soups.append(BeautifulSoup(self.driver.page_source, 'lxml').select('.gallery_fluid-column-block'))
+                    for block in BeautifulSoup(self.driver.page_source, 'lxml').select('.gallery_fluid-column-block'):
+                        soups.append(block)
                     break
             else:
                 last_height = new_height
         self.driver.quit()
-        for item in soups:
-            items.append(item.get('href'))
-        await ImgDownload(items).download()
+
+        with multiprocessing.Pool(processes=20) as pool, tqdm(
+                ncols=lcolumn,
+                ascii=True,
+                unit='img',
+                bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
+                desc=f'| Parsing site {self.url.split('/')[2]}',
+                total=len(soups)) as pbar:
+            for result in pool.imap(get_url, soups):
+                if result is not None:
+                    items.append(result)
+                pbar.update()
+                pbar.refresh()
+
+        return items

@@ -1,5 +1,6 @@
 import math
 import os
+from functools import lru_cache
 
 import numpy as np
 import torch
@@ -25,6 +26,11 @@ class TrainModel:
         self.epoch: int = 0
         self.avg_psnr: float = 0.0
         self.best_psnr = float('-inf')
+
+    @lru_cache(maxsize=200)  # Используем кэширование для подготовки данных
+    def prepare_data(self, lr_imgs, hr_imgs):
+        """Подготовка данных с кэшированием"""
+        return lr_imgs.to(device), hr_imgs.to(device)
 
     def validate_model(self, dataloader) -> None:
         print_center(f"Validation metrics for epoch {self.epoch}")
@@ -86,7 +92,6 @@ class TrainModel:
     def train_model(self):
         self.model.train()
         running_loss: float = 0
-        best_psnr = float('-inf')
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
@@ -94,7 +99,7 @@ class TrainModel:
         noise_types: list[str] = [None, 'pixelated', 'gaus', 'quantize', 'salt_paper', 'color_salt_paper']
         noises: list[str] | None = list()
         for _id, noise in enumerate(noise_types):
-            print_center(f"Add Noise {noise}")
+            print_center(f"Add Noise")
             prob = 0.5
             self.epochs = 100
             if noise is None:
@@ -108,7 +113,7 @@ class TrainModel:
             noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
             dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
             dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-            print(f"Noises: {', '.join(noises)}")
+            print(f"Noises: {'not noises' if noises is None else noises[0] if len(noises) == 1 else ', '.join(noises)}")
             pbar = tqdm(
                 dataloader,
                 unit='bath',
@@ -124,8 +129,8 @@ class TrainModel:
                     dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
                     dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
                 for lr_imgs, hr_imgs in pbar:
-                    lr_imgs = lr_imgs.to(device)
-                    hr_imgs = hr_imgs.to(device)
+                    # Подготавливаем данные с кэшированием
+                    lr_imgs, hr_imgs = self.prepare_data(lr_imgs, hr_imgs)
                     self.optimizer.zero_grad()
                     outputs = self.model(lr_imgs)
                     loss = self.criterion(outputs, hr_imgs)
@@ -137,7 +142,7 @@ class TrainModel:
                     del lr_imgs, hr_imgs, loss
                     torch.cuda.empty_cache()
                 # Периодически проверяем качество модели на валидации
-                if self.epoch % 10 == 0 or self.epoch == self.epochs:
+                if self.epoch != 1 and (self.epoch % 10 == 0 or self.epoch == self.epochs):
                     self.validate_model(dataloader)
 
                 # Сохраняем лучшую модель по PSNR
@@ -145,11 +150,8 @@ class TrainModel:
                     self.best_psnr = self.avg_psnr
                     self.model.eval()
                     enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
-                    torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{best_psnr:.4f}.pth')
+                    torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{self.best_psnr:.4f}.pth')
 
                 torch.cuda.empty_cache()
-
-                pbar.update()
-                pbar.refresh()
 
             print("-" * lcolumn)

@@ -2,12 +2,10 @@ import multiprocessing
 import re
 import time
 
-import aiohttp
 import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from app.parser.dowload import ImgDownload
 from app.config import lcolumn
 
 
@@ -38,8 +36,8 @@ class Parse:
         self.url: str = url
         html = requests.get(url).text
         self.soup = BeautifulSoup(html, 'lxml')
-
-    async def download_images(self) -> None:
+    @property
+    def download_images(self) -> list[str]:
         items: list[str] = list()
         max_page: int = int(self.soup.select('.pages a')[-2:][0].text)
         with multiprocessing.Pool(processes=20) as pool, tqdm(
@@ -55,4 +53,4 @@ class Parse:
                 pbar.update()
                 pbar.refresh()
 
-        await ImgDownload(items).download()
+        return items
