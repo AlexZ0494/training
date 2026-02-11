@@ -17,7 +17,7 @@ from app.utils.consolegui import print_center
 
 
 class TrainModel:
-    def __init__(self, model, criterion, optimizer, epochs: int = 100, batch_size: int = 3):
+    def __init__(self, model, criterion, optimizer, epochs: int = 100, batch_size: int = 6):
         self.model = model
         self.batch_size = batch_size
         self.criterion = criterion

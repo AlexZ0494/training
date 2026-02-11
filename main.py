@@ -28,17 +28,17 @@ if __name__ == "__main__":
     print_center("Dowload images for training model")
     # download_path: str = 'app/models/dataset'
     data: list[str] = list()
-    # data.extend(asyncio.run(akspic().download_images))
-    # data.extend(wallpaperscraft().download_images)
-    # data.extend(forkwallpapers().download_images)
-    # data.extend(hdqwalls().download_images)
-    # ImgDownload(data).download()
-    torch.cuda.set_device(1)
-    print_center("Run training model")
-    display_gpu_info(torch)
-
-    model = UpscaleModel().to(device)
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
-
-    TrainModel(model, criterion, optimizer).train_model()
+    data.extend(asyncio.run(akspic().download_images))
+    data.extend(wallpaperscraft().download_images)
+    data.extend(forkwallpapers().download_images)
+    data.extend(hdqwalls().download_images)
+    ImgDownload(data).download()
+    # torch.cuda.set_device(1)
+    # print_center("Run training model")
+    # display_gpu_info(torch)
+    #
+    # model = UpscaleModel().to(device)
+    # criterion = nn.MSELoss()
+    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
+    #
+    # TrainModel(model, criterion, optimizer).train_model()
