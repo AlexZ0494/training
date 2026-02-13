@@ -1,15 +1,13 @@
 import math
-import os
 from functools import lru_cache
 
-import numpy as np
 import torch
 from torch.utils.data import random_split, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 from skimage.metrics import structural_similarity as ssim_skimage
 
-from app.config import device, lcolumn, model_dir, lr_dir, hr_dir, lr_tst_dir, hr_tst_dir
+from app.config import device, lcolumn, model_dir, lr_dir, hr_dir
 from app.models.dataset import SRDataset
 from app.noise import NoiseAugmenter
 from app.residual_block.test import enhance_image
@@ -86,7 +84,12 @@ class TrainModel:
         print(f"Average SSIM: {avg_ssim:.4f}")
         print("-" * lcolumn)
 
-        torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{self.best_psnr:.4f}.pth')
+        # Сохраняем лучшую модель по PSNR
+        if self.avg_psnr > self.best_psnr:
+            self.best_psnr = self.avg_psnr
+            enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
+            torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{self.best_psnr:.4f}.pth')
+
         self.model.train()
 
     def train_model(self):
@@ -96,7 +99,7 @@ class TrainModel:
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
-        noise_types: list[str] = [None, 'pixelated', 'gaus', 'quantize', 'salt_paper', 'color_salt_paper']
+        noise_types: list[str] = [None, 'pixelated', 'gaus', 'quantize', 'salt_paper', 'color_salt_paper', 'add_color']
         noises: list[str] | None = list()
         for _id, noise in enumerate(noise_types):
             print_center(f"Add Noise")
@@ -104,7 +107,7 @@ class TrainModel:
             self.epochs = 100
             if noise is None:
                 noises = noise
-            elif noise == 'pixelated':
+            elif noise == 'quantize':
                 self.epochs = 200
             else:
                 noises.append(noise)
@@ -142,16 +145,11 @@ class TrainModel:
                     del lr_imgs, hr_imgs, loss
                     torch.cuda.empty_cache()
                 # Периодически проверяем качество модели на валидации
-                if self.epoch != 1 and (self.epoch % 10 == 0 or self.epoch == self.epochs):
+                if self.epoch != 1 and self.epoch % 10 == 0:
                     self.validate_model(dataloader)
 
-                # Сохраняем лучшую модель по PSNR
-                if self.avg_psnr > self.best_psnr:
-                    self.best_psnr = self.avg_psnr
-                    self.model.eval()
-                    enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
-                    torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{self.best_psnr:.4f}.pth')
-
                 torch.cuda.empty_cache()
+
+            self.validate_model(dataloader)
 
             print("-" * lcolumn)

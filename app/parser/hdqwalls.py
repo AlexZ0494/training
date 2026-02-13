@@ -50,8 +50,8 @@ class Parse:
                 unit='page',
                 bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
                 desc=f'| Parsing site {self.url.split('/')[2]}',
-                total=max_page) as pbar:
-            for result in pool.imap(get_url, [self.url.replace('page/1', f'page/{i}') for i in range(1, max_page)]):
+                total=1000) as pbar:
+            for result in pool.imap(get_url, [self.url.replace('page/1', f'page/{i}') for i in range(1, 1000)]):
                 for item in result:
                     items.append(item)
                 pbar.update()

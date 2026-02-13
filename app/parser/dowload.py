@@ -38,7 +38,7 @@ class ImgDownload:
         self.data: list[str] = data
         self.session = None
 
-    def download(self):
+    def download(self, ind: int = 0):
         with multiprocessing.Pool(processes=20) as pool, tqdm(
                 ncols=lcolumn,
                 ascii=True,
@@ -46,7 +46,7 @@ class ImgDownload:
                 bar_format='{l_bar}{bar}| {elapsed}/{remaining} | {rate_noinv_fmt}',
                 desc=f'Dowloading files',
                 total=len(self.data)) as pbar:
-            for _ in pool.imap(dwnl, enumerate(self.data)):
+            for _ in pool.imap(dwnl, enumerate(self.data, start=ind)):
                 pbar.update()
                 pbar.refresh()
         print('-' * lcolumn)

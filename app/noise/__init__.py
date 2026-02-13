@@ -2,6 +2,7 @@ import numpy
 from PIL import Image
 from PIL.ImageFile import ImageFile
 from .noises import gaus_noise, salt_a_paper, color_salt_paper, quantize_image, shot_noise, pixelated
+from .colors import adjust_brightness, adjust_rgb_channels, adjust_contrast, enhance_sharpness
 
 
 class NoiseAugmenter(object):
@@ -27,6 +28,10 @@ class NoiseAugmenter(object):
                         noisy_img = shot_noise(noisy_img, self.prob)
                     case 'pixelated':
                         noisy_img = pixelated(noisy_img, self.prob)
+                    case 'add_color':
+                        noisy_img = adjust_brightness(noisy_img)
+                        noisy_img = adjust_rgb_channels(noisy_img)
+                        noisy_img = adjust_contrast(noisy_img)
                     case _:
                         ...
         return Image.fromarray(noisy_img)

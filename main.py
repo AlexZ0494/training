@@ -26,13 +26,12 @@ os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 
 if __name__ == "__main__":
     print_center("Dowload images for training model")
-    # download_path: str = 'app/models/dataset'
     data: list[str] = list()
-    data.extend(asyncio.run(akspic().download_images))
-    data.extend(wallpaperscraft().download_images)
+    # data.extend(asyncio.run(akspic().download_images))
+    # data.extend(wallpaperscraft().download_images)
     data.extend(forkwallpapers().download_images)
-    data.extend(hdqwalls().download_images)
-    ImgDownload(data).download()
+    # data.extend(hdqwalls().download_images)
+    ImgDownload(data).download(ind=51537)
     # torch.cuda.set_device(1)
     # print_center("Run training model")
     # display_gpu_info(torch)
