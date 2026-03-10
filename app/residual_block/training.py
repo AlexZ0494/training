@@ -2,6 +2,7 @@ import math
 from functools import lru_cache
 
 import torch
+from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import random_split, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
@@ -15,20 +16,15 @@ from app.utils.consolegui import print_center
 
 
 class TrainModel:
-    def __init__(self, model, criterion, optimizer, epochs: int = 100, batch_size: int = 6):
-        self.model = model
+    def __init__(self, model, criterion, optimizer, epochs: int = 1_000, batch_size: int = 4):
+        self.model = model.to(device)
         self.batch_size = batch_size
-        self.criterion = criterion
+        self.criterion = criterion.to(device)
         self.optimizer = optimizer
         self.epochs = epochs
-        self.epoch: int = 0
+        self.epoch: int = 1
         self.avg_psnr: float = 0.0
         self.best_psnr: float = 0.0
-
-    @lru_cache(maxsize=4_000)
-    def prepare_data(self, lr_imgs, hr_imgs):
-        """Подготовка данных с кэшированием"""
-        return lr_imgs.to(device), hr_imgs.to(device)
 
     def validate_model(self, dataloader) -> None:
         print_center(f"Validation metrics for epoch {self.epoch}")
@@ -43,7 +39,7 @@ class TrainModel:
         _, val_dataset = random_split(dataset, [train_size, val_size])
 
         # Формируем новый валидный DataLoader
-        val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+        val_dataloader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
         total_psnr: float = 0.0
         total_ssim: float = 0.0
@@ -70,7 +66,7 @@ class TrainModel:
                         win_size=11
                     )
                 except:
-                    ssim_val = float('-inf')
+                    ssim_val = 0.0
                 total_ssim += ssim_val
 
                 count += 1
@@ -87,7 +83,7 @@ class TrainModel:
         # Сохраняем лучшую модель по PSNR
         if self.avg_psnr > self.best_psnr:
             self.best_psnr = self.avg_psnr
-            enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
+            # enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
             torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{self.best_psnr:.4f}.pth')
 
         self.model.train()
@@ -99,24 +95,21 @@ class TrainModel:
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
-        noise_types: list[str] = [None, 'pixelated', 'gaus', 'quantize', 'salt_paper', 'color_salt_paper', 'add_color']
-        noises: list[str] | None = list()
-        for _id, noise in enumerate(noise_types):
-            print_center(f"Add Noise")
-            prob = 0.5
-            self.epochs = 100
-            if noise is None:
-                noises = noise
-            elif noise == 'quantize':
-                self.epochs = 200
-            else:
-                noises.append(noise)
-            if _id == len(noise_types):
-                self.epochs = 300
-            noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
-            dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-            print(f"Noises: {'not noises' if noises is None else noises[0] if len(noises) == 1 else ', '.join(noises)}")
+        noises: list[str] = ['gaus', 'quantize', 'salt_paper', 'color_salt_paper']
+        prob: float = 0.5
+        noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
+        dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        print_center("Add noise for model")
+        if noises is None or len(noises) == 0:
+            noise_str = 'No noises'
+        elif len(noises) == 1:
+            noise_str = f'{noises[0]}'
+        else:
+            noise_str = '\n    '.join([f"{i + 1}. {noise}" for i, noise in enumerate(noises)])
+        output = f"Noises:\n    {noise_str}"
+        print(output)
+        for self.epoch in range(1, self.epochs):
             pbar = tqdm(
                 dataloader,
                 unit='bath',
@@ -125,31 +118,31 @@ class TrainModel:
                 bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
                 desc=f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}'
             )
-            for self.epoch in range(1, self.epochs):
-                if self.epoch % 20 == 0:
-                    prob += 0.3
-                    noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
-                    dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
-                    dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-                for lr_imgs, hr_imgs in pbar:
-                    # Подготавливаем данные с кэшированием
-                    lr_imgs, hr_imgs = self.prepare_data(lr_imgs, hr_imgs)
-                    self.optimizer.zero_grad()
-                    outputs = self.model(lr_imgs)
-                    loss = self.criterion(outputs, hr_imgs)
-                    loss.backward()
-                    self.optimizer.step()
-                    running_loss += loss.item() * lr_imgs.size(0)
-                    pbar.set_description(
-                        f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}')
-                    del lr_imgs, hr_imgs, loss
-                    torch.cuda.empty_cache()
-                # Периодически проверяем качество модели на валидации
-                if self.epoch != 1 and self.epoch % 10 == 0:
-                    self.validate_model(dataloader)
-
+            # Периодически проверяем качество модели на валидации
+            if self.epoch != 1 and self.epoch % 10 == 0:
+                self.validate_model(dataloader)
+            # Периодически увеличиваем скажения
+            if self.epoch != 1 and self.epoch % 100 == 0:
+                prob += 0.2
+                noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
+                dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
+                dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+            scaler = torch.amp.GradScaler('cuda')
+            for lr_imgs, hr_imgs in pbar:
+                self.optimizer.zero_grad()
+                with torch.amp.autocast('cuda'):
+                    outputs = self.model(lr_imgs.to(device))
+                    loss = self.criterion(outputs, hr_imgs.to(device))
+                scaler.scale(loss).backward()
+                scaler.step(self.optimizer)
+                scaler.update()
+                running_loss += loss.item() * lr_imgs.size(0)
+                pbar.set_description(
+                    f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}')
+                del lr_imgs, hr_imgs, loss
                 torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
 
-            self.validate_model(dataloader)
+        self.validate_model(dataloader)
 
-            print("-" * lcolumn)
+        print("-" * lcolumn)

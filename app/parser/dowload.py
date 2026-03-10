@@ -24,7 +24,7 @@ def dwnl(url: tuple[int, str]):
             try:
                 image = Image.open(file).convert('RGB')
                 image.save(f'{download_path}/train_high/img_{url[0]}.jpg')
-                low_image = image.resize((image.width // scale, image.height // scale), Image.NEAREST)
+                low_image = image.resize((round(image.width / scale), round(image.height / scale)))
                 low_image.save(f'{download_path}/train_low/img_{url[0]}.jpg')
             except UnidentifiedImageError:
                 pass
@@ -46,7 +46,7 @@ class ImgDownload:
                 bar_format='{l_bar}{bar}| {elapsed}/{remaining} | {rate_noinv_fmt}',
                 desc=f'Dowloading files',
                 total=len(self.data)) as pbar:
-            for _ in pool.imap(dwnl, enumerate(self.data, start=ind)):
+            for _ in pool.imap(dwnl, enumerate(self.data)):
                 pbar.update()
                 pbar.refresh()
         print('-' * lcolumn)

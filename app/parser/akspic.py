@@ -43,6 +43,7 @@ class Parse:
                         for block in BeautifulSoup(self.driver.page_source, 'lxml').select(
                                 '.gallery_fluid-column-block'):
                             soups.append(block.get('href'))
+                        break
                         next_page.click()
                         time.sleep(3)
                 except:

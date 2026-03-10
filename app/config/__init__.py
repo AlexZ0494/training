@@ -1,3 +1,4 @@
+import os
 import shutil
 
 import torch
@@ -15,3 +16,7 @@ prob: float = 0.5
 epochs: int = 2000
 scale: int = 4
 batch_size: int = 3
+
+# Каталог для кэша
+CACHE_DIR = '/tmp/cache/'
+os.makedirs(CACHE_DIR, exist_ok=True)

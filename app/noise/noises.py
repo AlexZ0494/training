@@ -30,6 +30,7 @@ def gaus_noise(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 
 
 def salt_a_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
+    prob = prob if prob <= 10 else 10
     row, col = image.shape[:2]
     num_salt = int(np.ceil(row * col * (prob / 100)))
     num_pepper = int(np.ceil(row * col * (prob / 100)))
@@ -41,7 +42,10 @@ def salt_a_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 
 def color_salt_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
     s_vs_p = 0.5
-    amount = prob / 10
+    if prob <= 3:
+        amount = prob / 10
+    else:
+        amount = 0.3
     out = np.copy(image)
     num_colors = np.ceil(amount * image.size * s_vs_p)
     colors = np.random.randint(low=0, high=256, size=(int(num_colors), 3))
@@ -52,7 +56,10 @@ def color_salt_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 
 
 def quantize_image(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
-    factor = prob * 10
+    if prob <= 10:
+        factor = prob * 10
+    else:
+        factor = 100
     quantized_image = np.floor_divide(image, factor) * factor
     return quantized_image.astype(np.uint8)
 
