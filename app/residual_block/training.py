@@ -25,8 +25,10 @@ class TrainModel:
         self.version: float = 0.01
         self.total_ssim: float = 0.0
 
-    def validate_model(self, dataloader, save_check: bool = False) -> None:
-        print_center(f"Checkpoint: {self.epoch}" if save_check is False else "Validate Checkpoint")
+    def validate_model(self, dataloader, save_check: bool = False, exit_training: bool = False) -> None:
+        print_center(
+            f"Checkpoint: {self.epoch}" if save_check is False else "Validate Checkpoint" if exit_training is False else "Exit Trainig"
+        )
         self.model.eval()
 
         # Сначала получаем ссылку на dataset, который использовался для формирования dataloader
@@ -92,6 +94,8 @@ class TrainModel:
                 f'{model_dir}/QualityLifter-v{self.version:.2f}_ssim{total_ssim:.4f}.pth'
             )
             self.version += 0.01
+        if exit_training is True:
+            torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
 
         self.model.train()
 
@@ -157,7 +161,7 @@ class TrainModel:
                     self.validate_model(dataloader)
                 torch.cuda.empty_cache()
                 self.epoch += 1
-        except SystemExit as e:
+        except KeyboardInterrupt:
             print_center("Exit Training")
             self.validate_model(dataloader)
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
