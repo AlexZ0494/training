@@ -6,7 +6,7 @@ from .colors import adjust_brightness, adjust_rgb_channels, adjust_contrast, enh
 
 
 class NoiseAugmenter(object):
-    def __init__(self, noise_types:list[str] | None, prob:float = 0.5):
+    def __init__(self, noise_types:list[str] | None, prob:float = 2):
         self.noise_types: list[str] = noise_types
         self.prob: float = prob
 

@@ -1,33 +1,32 @@
+import datetime
 import math
-from functools import lru_cache
 
 import torch
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import random_split, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 from skimage.metrics import structural_similarity as ssim_skimage
 
-from app.config import device, lcolumn, model_dir, lr_dir, hr_dir
+from app.config import device, lcolumn, model_dir, lr_dir, hr_dir, checkpoin_dir
 from app.models.dataset import SRDataset
 from app.noise import NoiseAugmenter
-from app.residual_block.test import enhance_image
 from app.utils.consolegui import print_center
 
 
 class TrainModel:
-    def __init__(self, model, criterion, optimizer, epochs: int = 1_000, batch_size: int = 4):
+    def __init__(self, model, criterion, optimizer, batch_size: int = 5, best_psnr: float = 0.0):
         self.model = model.to(device)
         self.batch_size = batch_size
         self.criterion = criterion.to(device)
         self.optimizer = optimizer
-        self.epochs = epochs
         self.epoch: int = 1
-        self.avg_psnr: float = 0.0
-        self.best_psnr: float = 0.0
+        self.avg_psnr: float = float('inf')
+        self.best_psnr: float = best_psnr
+        self.version: float = 0.01
+        self.total_ssim: float = 0.0
 
-    def validate_model(self, dataloader) -> None:
-        print_center(f"Validation metrics for epoch {self.epoch}")
+    def validate_model(self, dataloader, save_check: bool = False) -> None:
+        print_center(f"Checkpoint: {self.epoch}" if save_check is False else "Validate Checkpoint")
         self.model.eval()
 
         # Сначала получаем ссылку на dataset, который использовался для формирования dataloader
@@ -67,24 +66,32 @@ class TrainModel:
                     )
                 except:
                     ssim_val = 0.0
-                total_ssim += ssim_val
+                self.total_ssim += ssim_val
 
                 count += 1
 
         self.avg_psnr = total_psnr / count
-        avg_ssim: float = total_ssim / count
+        avg_ssim: float = self.total_ssim / count
 
         print("-" * lcolumn)
         print(f"Average PSNR: {self.avg_psnr:.4f}")
-        print(f"Best PSNR: {self.best_psnr:.4f}")  # Предполагается, что self.best_psnr инициализирован ранее
+        print(f"Best PSNR: {self.best_psnr:.4f}" if save_check is False else f"Best PSNR: 0")  # Предполагается, что self.best_psnr инициализирован ранее
         print(f"Average SSIM: {avg_ssim:.4f}")
         print("-" * lcolumn)
+        print("*" * lcolumn)
 
         # Сохраняем лучшую модель по PSNR
-        if self.avg_psnr > self.best_psnr:
+        if self.avg_psnr > self.best_psnr and save_check is False:
             self.best_psnr = self.avg_psnr
-            # enhance_image(self.model, f'trained_upscale_model_{self.best_psnr:.4f}')
-            torch.save(self.model.state_dict(), f'{model_dir}/trained_upscale_model_{self.best_psnr:.4f}.pth')
+            torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
+        else:
+            self.best_psnr = self.avg_psnr
+        if avg_ssim > 0:
+            torch.save(
+                self.model.state_dict(),
+                f'{model_dir}/QualityLifter-v{self.version:.2f}_ssim{total_ssim:.4f}.pth'
+            )
+            self.version += 0.01
 
         self.model.train()
 
@@ -96,9 +103,17 @@ class TrainModel:
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
         noises: list[str] = ['gaus', 'quantize', 'salt_paper', 'color_salt_paper']
-        prob: float = 0.5
+        prob: float = 10
+        check_count: int = 0
+        u_loader_epoch: int = -5
         noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
-        dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
+        dataset = SRDataset(
+            lr_dir,
+            hr_dir,
+            transform=transform,
+            noise_augmenter=noise_augmenter,
+            cnt_im=15_000
+        )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         print_center("Add noise for model")
         if noises is None or len(noises) == 0:
@@ -109,40 +124,43 @@ class TrainModel:
             noise_str = '\n    '.join([f"{i + 1}. {noise}" for i, noise in enumerate(noises)])
         output = f"Noises:\n    {noise_str}"
         print(output)
-        for self.epoch in range(1, self.epochs):
-            pbar = tqdm(
-                dataloader,
-                unit='bath',
-                ncols=lcolumn,
-                ascii=True,
-                bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
-                desc=f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}'
-            )
-            # Периодически проверяем качество модели на валидации
-            if self.epoch != 1 and self.epoch % 10 == 0:
-                self.validate_model(dataloader)
-            # Периодически увеличиваем скажения
-            if self.epoch != 1 and self.epoch % 100 == 0:
-                prob += 0.2
-                noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
-                dataset = SRDataset(lr_dir, hr_dir, transform=transform, noise_augmenter=noise_augmenter)
-                dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-            scaler = torch.amp.GradScaler('cuda')
-            for lr_imgs, hr_imgs in pbar:
-                self.optimizer.zero_grad()
-                with torch.amp.autocast('cuda'):
-                    outputs = self.model(lr_imgs.to(device))
-                    loss = self.criterion(outputs, hr_imgs.to(device))
-                scaler.scale(loss).backward()
-                scaler.step(self.optimizer)
-                scaler.update()
-                running_loss += loss.item() * lr_imgs.size(0)
-                pbar.set_description(
-                    f'| Epoch {self.epoch}/{self.epochs} | Loss {running_loss / len(dataloader.dataset):.2f}')
-                del lr_imgs, hr_imgs, loss
+        if self.best_psnr > 0:
+            self.validate_model(dataloader, True)
+        print(f"max check Best PSNR: {self.best_psnr:.4f}")
+        print_center("START Training")
+        print(f' {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
+        try:
+            while self.total_ssim < 100 and check_count <= 60:
+                pbar = tqdm(
+                    dataloader,
+                    unit='batch',
+                    ncols=lcolumn,
+                    ascii=True,
+                    bar_format='{n}/{total} {l_bar}{bar}| {elapsed}/{remaining} |{rate_noinv_fmt}',
+                    desc=f'| Epoch {self.epoch} | Loss {running_loss / len(dataloader.dataset):.2f}',
+                    postfix=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                )
+                scaler = torch.amp.GradScaler('cuda')
+                for lr_imgs, hr_imgs in pbar:
+                    self.optimizer.zero_grad()
+                    with torch.amp.autocast('cuda'):
+                        outputs = self.model(lr_imgs.to(device))
+                        loss = self.criterion(outputs, hr_imgs.to(device))
+                    scaler.scale(loss).backward()
+                    scaler.step(self.optimizer)
+                    scaler.update()
+                    running_loss += loss.item() * lr_imgs.size(0)
+                    pbar.set_description(
+                        f'| Epoch {self.epoch} | Loss {running_loss / len(dataloader.dataset):.2f}')
+                    del lr_imgs, hr_imgs, loss
+                    torch.cuda.empty_cache()
+                    self.validate_model(dataloader)
                 torch.cuda.empty_cache()
-            torch.cuda.empty_cache()
+                self.epoch += 1
+        except SystemExit as e:
+            print_center("Exit Training")
+            self.validate_model(dataloader)
+            torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
 
-        self.validate_model(dataloader)
-
-        print("-" * lcolumn)
+        print("-" * lcolumn, end='\n\n')
+        print_center("END Training")

@@ -23,8 +23,7 @@ def pixelated(image: numpy.ndarray, prob: float=0.5)-> numpy.ndarray:
 
 
 def gaus_noise(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
-    quality: int = int(10 * prob)
-    quality = 3 if quality < 3 else 25 if quality > 25 else quality
+    quality = prob if prob < 7 else 7
     skize = tuple(quality for _ in range(2))
     return cv2.GaussianBlur(image, ksize=skize, sigmaX=0)
 

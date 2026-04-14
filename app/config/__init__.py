@@ -19,4 +19,7 @@ batch_size: int = 3
 
 # Каталог для кэша
 CACHE_DIR = '/tmp/cache/'
+checkpoin_dir = f'{model_dir}/checkpoint'
+
+os.makedirs(checkpoin_dir, exist_ok=True)
 os.makedirs(CACHE_DIR, exist_ok=True)

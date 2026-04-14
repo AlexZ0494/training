@@ -3,9 +3,10 @@ import asyncio
 import torch
 import torch.nn as nn
 import torch.distributed as dist
+from numba.parfors.parfor import max_checker
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullyShardedDataParallel
 
-from app.config import device
+from app.config import device, checkpoin_dir
 from app.parser.dowload import ImgDownload
 from app.residual_block.test import enhance_image
 from app.residual_block.training import TrainModel
@@ -18,6 +19,8 @@ from app.parser.hdqwalls import Parse as hdqwalls
 
 
 import os
+
+from app.utils.extract_num import extract_number, extract_check
 
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -33,11 +36,21 @@ if __name__ == "__main__":
     # torch.cuda.set_device(1)
     print_center("Run training model")
     display_gpu_info(torch)
+    max_checker: str = ''
     model = UpscaleModel().to(device)
+    if len(os.listdir(checkpoin_dir)) > 0:
+        max_checker = extract_check(checkpoin_dir)
+        checkpoint = torch.load(f'{checkpoin_dir}/{max_checker}')
+        model.load_state_dict(checkpoint)
     criterion = nn.MSELoss()
     model_jit = torch.jit.script(model)
     optimizer = torch.optim.Adam(model_jit.parameters(), lr=1e-6)
-    TrainModel(model, criterion, optimizer).train_model()
-    # checkpoint = torch.load(r'app/models/model/trained_upscale_model_4.9707.pth')
+    TrainModel(
+        model,
+        criterion,
+        optimizer,
+        best_psnr=extract_number(max_checker) if max_checker != '' else 0.0
+    ).train_model()
+    # checkpoint = torch.load(f'app/models/model/trained_upscale_model_17.3597.pth')
     # model.load_state_dict(checkpoint)
-    # enhance_image(model, 'trained_upscale_model_4.9707')
+    # enhance_image(model, 'trained_upscale_model_17.3597')
