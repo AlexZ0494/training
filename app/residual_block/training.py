@@ -117,7 +117,7 @@ class TrainModel:
             hr_dir,
             transform=transform,
             noise_augmenter=noise_augmenter,
-            cnt_im=20_000
+            cnt_im=15_000
         )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         print_center("Add noise for model")
@@ -162,6 +162,7 @@ class TrainModel:
                         f'| Epoch {self.epoch} | Loss {running_loss / len(dataloader.dataset):.2f}')
                     del lr_imgs, hr_imgs, loss
                     torch.cuda.empty_cache()
+                if self.epoch != 1 and self.epoch % 10 == 0:
                     self.validate_model(dataloader)
                 torch.cuda.empty_cache()
                 self.epoch += 1
