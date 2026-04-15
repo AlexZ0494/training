@@ -23,7 +23,7 @@ def pixelated(image: numpy.ndarray, prob: float=0.5)-> numpy.ndarray:
 
 
 def gaus_noise(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
-    quality = prob if prob < 7 else 7
+    quality = prob // 2 if prob < 7 else 7
     skize = tuple(quality for _ in range(2))
     return cv2.GaussianBlur(image, ksize=skize, sigmaX=0)
 
@@ -31,8 +31,8 @@ def gaus_noise(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 def salt_a_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
     prob = prob if prob <= 10 else 10
     row, col = image.shape[:2]
-    num_salt = int(np.ceil(row * col * (prob / 100)))
-    num_pepper = int(np.ceil(row * col * (prob / 100)))
+    num_salt = int(np.ceil(row * col * (prob / 1000)))
+    num_pepper = int(np.ceil(row * col * (prob / 1000)))
     coords = [np.random.randint(0, i - 1, size=num_salt + num_pepper) for i in [row, col]]
     image[coords[0][:num_salt], coords[1][:num_salt]] = 255
     image[coords[0][num_salt:], coords[1][num_salt:]] = 0
@@ -42,7 +42,7 @@ def salt_a_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 def color_salt_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
     s_vs_p = 0.5
     if prob <= 3:
-        amount = prob / 10
+        amount = prob / 10000
     else:
         amount = 0.3
     out = np.copy(image)
@@ -56,9 +56,9 @@ def color_salt_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 
 def quantize_image(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
     if prob <= 10:
-        factor = prob * 10
+        factor = (prob * 10) // 5
     else:
-        factor = 100
+        factor = 100 // 5
     quantized_image = np.floor_divide(image, factor) * factor
     return quantized_image.astype(np.uint8)
 

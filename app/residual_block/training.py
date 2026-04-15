@@ -27,7 +27,7 @@ class TrainModel:
 
     def validate_model(self, dataloader, save_check: bool = False, exit_training: bool = False) -> None:
         print_center(
-            f"Checkpoint: {self.epoch}" if save_check is False else "Validate Checkpoint" if exit_training is False else "Exit Trainig"
+            f"Checkpoint: {self.epoch}" if save_check is False and exit_training is False else "Validate Checkpoint" if exit_training is False else "Exit Trainig"
         )
         self.model.eval()
 
@@ -100,14 +100,15 @@ class TrainModel:
         self.model.train()
 
     def train_model(self):
+        day_now: datetime = datetime.datetime.now()
         self.model.train()
         running_loss: float = 0
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
-        noises: list[str] = ['gaus', 'quantize', 'salt_paper', 'color_salt_paper']
-        prob: float = 10
+        noises: list[str] = ['gaus', 'salt_paper', 'quantize']
+        prob: float = 8
         check_count: int = 0
         u_loader_epoch: int = -5
         noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
@@ -116,7 +117,7 @@ class TrainModel:
             hr_dir,
             transform=transform,
             noise_augmenter=noise_augmenter,
-            cnt_im=15_000
+            cnt_im=20_000
         )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         print_center("Add noise for model")
@@ -132,7 +133,7 @@ class TrainModel:
             self.validate_model(dataloader, True)
         print(f"max check Best PSNR: {self.best_psnr:.4f}")
         print_center("START Training")
-        print(f' {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
+        print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
         try:
             while self.total_ssim < 100 and check_count <= 60:
                 pbar = tqdm(
@@ -146,6 +147,9 @@ class TrainModel:
                 )
                 scaler = torch.amp.GradScaler('cuda')
                 for lr_imgs, hr_imgs in pbar:
+                    if day_now.day < datetime.datetime.now().day:
+                        day_now = datetime.datetime.now()
+                        print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
                     self.optimizer.zero_grad()
                     with torch.amp.autocast('cuda'):
                         outputs = self.model(lr_imgs.to(device))
@@ -162,8 +166,7 @@ class TrainModel:
                 torch.cuda.empty_cache()
                 self.epoch += 1
         except KeyboardInterrupt:
-            print_center("Exit Training")
-            self.validate_model(dataloader)
+            self.validate_model(dataloader, exit_training=True)
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
 
         print("-" * lcolumn, end='\n\n')
