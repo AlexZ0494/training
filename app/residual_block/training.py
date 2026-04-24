@@ -1,4 +1,5 @@
 import datetime
+import time
 import math
 
 import torch
@@ -14,18 +15,20 @@ from app.utils.consolegui import print_center
 
 
 class TrainModel:
-    def __init__(self, model, criterion, optimizer, batch_size: int = 5, best_psnr: float = 0.0):
+    def __init__(self, model, criterion, optimizer, batch_size: int = 15, best_psnr: float = 0.0):
         self.model = model.to(device)
         self.batch_size = batch_size
         self.criterion = criterion.to(device)
         self.optimizer = optimizer
         self.epoch: int = 1
-        self.avg_psnr: float = float('inf')
         self.best_psnr: float = best_psnr
         self.version: float = 0.01
         self.total_ssim: float = 0.0
+        self.avg_ssim: float = 0.0
+        self.check_count: int = 0
 
     def validate_model(self, dataloader, save_check: bool = False, exit_training: bool = False) -> None:
+        start_dt: datetime = datetime.datetime.now()
         print_center(
             f"Checkpoint: {self.epoch}" if save_check is False and exit_training is False else "Validate Checkpoint" if exit_training is False else "Exit Trainig"
         )
@@ -72,23 +75,25 @@ class TrainModel:
 
                 count += 1
 
-        self.avg_psnr = total_psnr / count
-        avg_ssim: float = self.total_ssim / count
-
+        avg_psnr = total_psnr / count
+        self.avg_ssim = self.total_ssim / count if self.total_ssim / count > 0 else 0
+        time_spent: datetime = start_dt - datetime.datetime.now()
         print("-" * lcolumn)
-        print(f"Average PSNR: {self.avg_psnr:.4f}")
+        print(f"Average PSNR: {avg_psnr:.4f}")
         print(f"Best PSNR: {self.best_psnr:.4f}" if save_check is False else f"Best PSNR: 0")  # Предполагается, что self.best_psnr инициализирован ранее
-        print(f"Average SSIM: {avg_ssim:.4f}")
+        print(f"Average SSIM: {self.avg_ssim:.4f}")
+        print(f"Time spent on validation: {time.strftime("%H:%M:%S", time.gmtime(time_spent.seconds))}")
         print("-" * lcolumn)
         print("*" * lcolumn)
 
         # Сохраняем лучшую модель по PSNR
-        if self.avg_psnr > self.best_psnr and save_check is False:
-            self.best_psnr = self.avg_psnr
+        if avg_psnr > self.best_psnr and save_check is False:
+            self.best_psnr = avg_psnr
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
         else:
-            self.best_psnr = self.avg_psnr
-        if avg_ssim > 0:
+            self.best_psnr = avg_psnr
+        if self.avg_ssim > 0:
+            self.check_count += 1
             torch.save(
                 self.model.state_dict(),
                 f'{model_dir}/QualityLifter-v{self.version:.2f}_ssim{total_ssim:.4f}.pth'
@@ -100,7 +105,6 @@ class TrainModel:
         self.model.train()
 
     def train_model(self):
-        day_now: datetime = datetime.datetime.now()
         self.model.train()
         running_loss: float = 0
         transform = transforms.Compose([
@@ -109,8 +113,6 @@ class TrainModel:
         ])
         noises: list[str] = ['gaus', 'salt_paper', 'quantize']
         prob: float = 8
-        check_count: int = 0
-        u_loader_epoch: int = -5
         noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
         dataset = SRDataset(
             lr_dir,
@@ -133,9 +135,10 @@ class TrainModel:
             self.validate_model(dataloader, True)
         print(f"max check Best PSNR: {self.best_psnr:.4f}")
         print_center("START Training")
+        day_now: datetime = datetime.datetime.now()
         print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
         try:
-            while self.total_ssim < 100 and check_count <= 60:
+            while self.avg_ssim < 10 and self.check_count <= 10:
                 pbar = tqdm(
                     dataloader,
                     unit='batch',
@@ -149,6 +152,7 @@ class TrainModel:
                 for lr_imgs, hr_imgs in pbar:
                     if day_now.day < datetime.datetime.now().day:
                         day_now = datetime.datetime.now()
+                        print()
                         print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
                     self.optimizer.zero_grad()
                     with torch.amp.autocast('cuda'):

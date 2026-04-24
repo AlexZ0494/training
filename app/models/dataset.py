@@ -5,6 +5,7 @@ from PIL.ImageFile import ImageFile
 from torch.utils.data import Dataset
 
 from ..noise import NoiseAugmenter
+Image.LOAD_TRUNCATED_IMAGES = True
 
 
 class SRDataset(Dataset):
