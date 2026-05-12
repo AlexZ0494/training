@@ -9,11 +9,17 @@ Image.LOAD_TRUNCATED_IMAGES = True
 
 
 class SRDataset(Dataset):
-    def __init__(self, lr_dir: str, hr_dir: str, cnt_im: int, transform=None, noise_augmenter=None):
+    def __init__(self, lr_dir: str, hr_dir: str, cnt_im_start: int, cnt_im_end: int | None = None, transform=None, noise_augmenter=None):
         self.lr_dir: str = lr_dir
         self.hr_dir: str = hr_dir
-        self.lr_paths: list[str] = sorted(os.listdir(lr_dir))[:cnt_im]
-        self.hr_paths: list[str]= sorted(os.listdir(hr_dir))[:cnt_im]
+        llr_dir: list[str] = sorted(os.listdir(lr_dir))
+        lhr_dir: list[str] = sorted(os.listdir(hr_dir))
+        if cnt_im_end is None:
+            self.lr_paths: list[str] = llr_dir[:cnt_im_start]
+            self.hr_paths: list[str]= lhr_dir[:cnt_im_start]
+        else:
+            self.lr_paths: list[str] = llr_dir[:cnt_im_start] + llr_dir[-cnt_im_end:]
+            self.hr_paths: list[str] = lhr_dir[:cnt_im_start] + lhr_dir[-cnt_im_end:]
         self.transform = transform
         self.noise_augmenter = noise_augmenter
 
@@ -33,5 +39,7 @@ class SRDataset(Dataset):
         if self.transform is not None:
             lr_image = self.transform(lr_image)
             hr_image = self.transform(hr_image)
+        # lr_image = lr_image.unsqueeze(0)
+        # hr_image = hr_image.unsqueeze(0)
 
         return lr_image, hr_image

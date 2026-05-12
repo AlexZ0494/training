@@ -23,9 +23,9 @@ def dwnl(url: tuple[int, str]):
             file = BytesIO(response.content)
             try:
                 image = Image.open(file).convert('RGB')
-                image.save(f'{download_path}/train_high/img_{url[0]}.jpg')
+                image.save(f'{download_path}/val_high/img_{url[0]}.jpg')
                 low_image = image.resize((round(image.width / scale), round(image.height / scale)))
-                low_image.save(f'{download_path}/train_low/img_{url[0]}.jpg')
+                low_image.save(f'{download_path}/val_low/img_{url[0]}.jpg')
             except UnidentifiedImageError:
                 pass
             run = False
@@ -39,14 +39,14 @@ class ImgDownload:
         self.session = None
 
     def download(self, ind: int = 0):
-        with multiprocessing.Pool(processes=20) as pool, tqdm(
+        with multiprocessing.Pool(processes=10) as pool, tqdm(
                 ncols=lcolumn,
                 ascii=True,
                 unit='img',
                 bar_format='{l_bar}{bar}| {elapsed}/{remaining} | {rate_noinv_fmt}',
                 desc=f'Dowloading files',
                 total=len(self.data)) as pbar:
-            for _ in pool.imap(dwnl, enumerate(self.data)):
+            for _ in pool.imap(dwnl, enumerate(self.data, start=ind)):
                 pbar.update()
                 pbar.refresh()
         print('-' * lcolumn)

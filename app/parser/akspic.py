@@ -21,7 +21,7 @@ def get_url(url: str) -> str | None:
 
 
 class Parse:
-    def __init__(self, url: str = 'https://akspic.ru/album/1920x1080'):
+    def __init__(self, url: str = 'https://akspic.ru/album/3840x2160'):
         self.url: str = url
         options = webdriver.ChromeOptions()
         self.driver = webdriver.Chrome(options=options)
@@ -54,7 +54,7 @@ class Parse:
                 last_height = new_height
         self.driver.quit()
 
-        with multiprocessing.Pool(processes=20) as pool, tqdm(
+        with multiprocessing.Pool(processes=10) as pool, tqdm(
                 ncols=lcolumn,
                 ascii=True,
                 unit='img',

@@ -6,6 +6,8 @@ import torch
 lcolumn: int = shutil.get_terminal_size()[0]
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 lr_dir: str = 'app/models/dataset/train_low'
+lv_dir: str = 'app/models/dataset/val_low'
+hv_dir: str = 'app/models/dataset/val_high'
 hr_dir: str = 'app/models/dataset/train_high'
 lr_tst_dir: str = 'app/models/dataset/test_low'
 hr_tst_dir: str = 'app/models/dataset/test_high'

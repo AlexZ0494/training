@@ -29,28 +29,46 @@ def gaus_noise(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
 
 
 def salt_a_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
-    prob = prob if prob <= 10 else 10
-    row, col = image.shape[:2]
-    num_salt = int(np.ceil(row * col * (prob / 1000)))
-    num_pepper = int(np.ceil(row * col * (prob / 1000)))
-    coords = [np.random.randint(0, i - 1, size=num_salt + num_pepper) for i in [row, col]]
-    image[coords[0][:num_salt], coords[1][:num_salt]] = 255
-    image[coords[0][num_salt:], coords[1][num_salt:]] = 0
-    return image
-
-
-def color_salt_paper(image: numpy.ndarray, prob: float=0.5) -> numpy.ndarray:
-    s_vs_p = 0.5
-    if prob <= 3:
-        amount = prob / 10000
-    else:
-        amount = 0.3
+    s_vs_p = 0.5  # Соотношение соли (белый) к перцу (черный)
+    amount = min(prob / 10000, 0.3)
     out = np.copy(image)
-    num_colors = np.ceil(amount * image.size * s_vs_p)
-    colors = np.random.randint(low=0, high=256, size=(int(num_colors), 3))
-    indices = np.random.choice(image.size // 3, size=int(num_colors), replace=False)
+
+    # Количество изменяемых пикселей
+    num_pixels = int(amount * image.size)
+
+    # Соль (белый шум)
+    num_salt = int(num_pixels * s_vs_p)
+    coords = [np.random.randint(0, i, num_salt) for i in image.shape]
+    out[coords[0], coords[1]] = [255, 255, 255]  # Белый
+
+    # Перец (черный шум)
+    num_pepper = num_pixels - num_salt
+    coords = [np.random.randint(0, i, num_pepper) for i in image.shape]
+    out[coords[0], coords[1]] = [0, 0, 0]  # Черный
+
+    return out
+
+
+def color_salt_paper(image: np.ndarray, prob: float = 0.5) -> np.ndarray:
+    s_vs_p = 0.5
+    amount = prob / 10000 if prob <= 3 else 0.15
+    out = np.copy(image)
+
+    # image.size — это общее число элементов (H * W * 3)
+    # image.size // 3 — число пикселей (H * W)
+    num_pixels = int(np.ceil(amount * image.size // 3 * s_vs_p))
+
+    # Генерируем случайные индексы пикселей (не элементов!)
+    indices = np.random.choice(image.size // 3, size=num_pixels, replace=False)
+    # Преобразуем плоские индексы в координаты (y, x)
     idx = np.unravel_index(indices, image.shape[:-1])
+
+    # Генерируем случайные цвета для каждого пикселя: (num_pixels, 3)
+    colors = np.random.randint(0, 256, size=(num_pixels, 3))
+
+    # Присваиваем цвета по координатам
     out[idx] = colors
+
     return out
 
 
