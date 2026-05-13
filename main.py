@@ -53,6 +53,6 @@ if __name__ == "__main__":
         optimizer,
         best_psnr=extract_number(max_checker) if max_checker != '' else 0.0
     ).train_model()
-    # checkpoint = torch.load(f'app/models/model/checkpoint/checkpoint_16.9335.pth')
-    # model.load_state_dict(checkpoint)
-    # enhance_image(model, 'trained_upscale_model_16.9335')
+    checkpoint = torch.load(f'app/models/model/checkpoint/checkpoint_16.9335.pth')
+    model.load_state_dict(checkpoint)
+    # enhance_image(model, max_checker)

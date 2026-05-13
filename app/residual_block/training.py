@@ -22,12 +22,14 @@ class TrainModel:
         self.optimizer = optimizer
         self.epoch: int = 1
         self.best_psnr: float = best_psnr
-        self.version: float = 0.01
+        self.version: float = 0.1
         self.total_ssim: float = 0.0
         self.avg_ssim: float = 0.0
         self.check_count: int = 0
+        self.noises: list[str] = ['gaus', 'salt_paper', 'quantize', 'color_salt_paper']
+        self.noises_test: list[str] = list()
 
-    def validate_model(self, noise_augmenter = None, save_check: bool = False, exit_training: bool = False) -> None:
+    def validate_model(self, save_check: bool = False, exit_training: bool = False) -> None:
         start_dt: datetime = datetime.datetime.now()
         print_center(
             f"Checkpoint: {self.epoch}" if save_check is False and exit_training is False else "Validate Checkpoint" if exit_training is False else "Exit Trainig"
@@ -38,12 +40,12 @@ class TrainModel:
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
-
+        noise_augmenter = NoiseAugmenter(self.noises_test, 16)
         val_dataset = SRDataset(
             lv_dir,
             hv_dir,
             transform=transform,
-            cnt_im_start=30,
+            cnt_im_start=3,
             noise_augmenter=noise_augmenter
         )
 
@@ -81,7 +83,6 @@ class TrainModel:
 
                 outputs_np = outputs.float().detach().cpu().numpy()
                 hr_imgs_np = hr_imgs.float().detach().cpu().numpy()
-
                 # Рассчитываем SSIM
                 ssim_val = ssim_skimage(
                     outputs_np,
@@ -112,16 +113,18 @@ class TrainModel:
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
         else:
             self.best_psnr = avg_psnr
-        if self.avg_ssim == 1 or self.avg_ssim > 1:
+        if self.avg_ssim >= 1.0:
             self.check_count += 1
             torch.save(
                 self.model.state_dict(),
-                f'{model_dir}/QualityLifter-v{self.version:.2f}_ssim{total_ssim:.4f}.pth'
+                f'{model_dir}/QualityLifter-v{self.version:.2f}_avgpsnr{avg_psnr:.4f}.pth'
             )
-            self.version += 0.01
+            self.version += 0.1
+            self.noises_test.append(self.noises[len(self.noises_test)])
         if exit_training is True:
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
         pbar.close()
+        print(self.noises_test)
         self.model.train()
 
     def train_model(self):
@@ -131,9 +134,8 @@ class TrainModel:
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
-        noises: list[str] = ['gaus', 'salt_paper', 'quantize', 'color_salt_paper']
         prob: float = 12
-        noise_augmenter = NoiseAugmenter(noise_types=noises, prob=prob)
+        noise_augmenter = NoiseAugmenter(noise_types=self.noises, prob=prob)
         dataset = SRDataset(
             lr_dir,
             hr_dir,
@@ -144,28 +146,22 @@ class TrainModel:
         )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         print_center("Add noise for model")
-        if noises is None or len(noises) == 0:
+        if self.noises is None or len(self.noises) == 0:
             noise_str = 'No noises'
-        elif len(noises) == 1:
-            noise_str = f'{noises[0]}'
+        elif len(self.noises) == 1:
+            noise_str = f'{self.noises[0]}'
         else:
-            noise_str = '\n    '.join([f"{i + 1}. {noise}" for i, noise in enumerate(noises)])
+            noise_str = '\n    '.join([f"{i + 1}. {noise}" for i, noise in enumerate(self.noises)])
         output = f"Noises:\n    {noise_str}"
         print(output)
         if self.best_psnr > 0:
             self.validate_model(save_check=True)
-        j = 0
-        noise: list[str] = list()
-        while self.avg_ssim >= 1:
-            noise += noises[j]
-            n = NoiseAugmenter(noise_types=noise, prob=15)
-            self.validate_model(n, True)
         print(f"max check Best PSNR: {self.best_psnr:.4f}")
         print_center("START Training")
         day_now: datetime = datetime.datetime.now()
         print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
         try:
-            while self.avg_ssim >= 0.9 and self.check_count <= 10:
+            while self.avg_ssim <= 1.0 or self.check_count <= 10:
                 pbar = tqdm(
                     dataloader,
                     unit='batch',
