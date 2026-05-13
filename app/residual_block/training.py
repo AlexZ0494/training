@@ -190,11 +190,11 @@ class TrainModel:
                     del lr_imgs, hr_imgs, loss
                     torch.cuda.empty_cache()
                 if self.epoch != 1 and self.epoch % 10 == 0:
-                    self.validate_model(dataloader, transform)
+                    self.validate_model()
                 torch.cuda.empty_cache()
                 self.epoch += 1
         except KeyboardInterrupt:
-            self.validate_model(dataloader, transform, exit_training=True)
+            self.validate_model(exit_training=True)
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
 
         print("-" * lcolumn, end='\n\n')
