@@ -94,7 +94,7 @@ class TrainModel:
                 self.total_ssim += ssim_val
                 count += 1
                 pbar.set_description(
-                    f'| AVG PSNR: {total_psnr / count:.4f} | AVG SSIM: {(self.total_ssim / count) * 100:.4f}%')
+                    f'| AVG PSNR: {total_psnr / count:.4f} | AVG SSIM: {self.total_ssim / count:.4f}')
         avg_psnr = total_psnr / count
         self.avg_ssim = self.total_ssim / count if self.total_ssim / count > 0 else 0
         time_spent: datetime = datetime.datetime.now() - start_dt
@@ -156,7 +156,7 @@ class TrainModel:
             self.validate_model(save_check=True)
         j = 0
         noise: list[str] = list()
-        while self.avg_ssim >= 1 and len(noise) != len(noises):
+        while self.avg_ssim >= 1:
             noise += noises[j]
             n = NoiseAugmenter(noise_types=noise, prob=15)
             self.validate_model(n, True)
@@ -165,7 +165,7 @@ class TrainModel:
         day_now: datetime = datetime.datetime.now()
         print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
         try:
-            while self.avg_ssim >= 1 and self.check_count <= 10:
+            while self.avg_ssim >= 0.9 and self.check_count <= 10:
                 pbar = tqdm(
                     dataloader,
                     unit='batch',
