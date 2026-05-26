@@ -36,9 +36,9 @@ if __name__ == "__main__":
     # data.extend(hdqwalls().download_images)
     # ImgDownload(data).download(ind=0)
     # torch.cuda.set_device(1)
-    # print_center("Run training model")
-    # display_gpu_info(torch)
-    # max_checker: str = ''
+    print_center("Run training model")
+    display_gpu_info(torch)
+    max_checker: str = ''
     model = UpscaleModel().to(device)
     if len(os.listdir(checkpoin_dir)) > 0:
         max_checker = extract_check(checkpoin_dir)
@@ -53,6 +53,6 @@ if __name__ == "__main__":
         optimizer,
         best_psnr=extract_number(max_checker) if max_checker != '' else 0.0
     ).train_model()
-    checkpoint = torch.load(f'app/models/model/checkpoint/checkpoint_16.9335.pth')
-    model.load_state_dict(checkpoint)
+    # checkpoint = torch.load(f'app/models/model/checkpoint/checkpoint_16.9335.pth')
+    # model.load_state_dict(checkpoint)
     # enhance_image(model, max_checker)

@@ -45,7 +45,7 @@ class TrainModel:
             lv_dir,
             hv_dir,
             transform=transform,
-            cnt_im_start=3,
+            cnt_im_start=300,
             noise_augmenter=noise_augmenter
         )
 
@@ -114,17 +114,16 @@ class TrainModel:
         else:
             self.best_psnr = avg_psnr
         if self.avg_ssim >= 1.0:
+            self.noises_test.append(self.noises[len(self.noises_test)])
             self.check_count += 1
             torch.save(
                 self.model.state_dict(),
                 f'{model_dir}/QualityLifter-v{self.version:.2f}_avgpsnr{avg_psnr:.4f}.pth'
             )
             self.version += 0.1
-            self.noises_test.append(self.noises[len(self.noises_test)])
         if exit_training is True:
             torch.save(self.model.state_dict(), f'{checkpoin_dir}/checkpoint_{self.best_psnr:.4f}.pth')
         pbar.close()
-        print(self.noises_test)
         self.model.train()
 
     def train_model(self):
