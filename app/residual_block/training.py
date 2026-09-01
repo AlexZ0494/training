@@ -45,14 +45,14 @@ class TrainModel:
             lv_dir,
             hv_dir,
             transform=transform,
-            cnt_im_start=300,
+            cnt_im_start=200,
             noise_augmenter=noise_augmenter
         )
 
         # 2. Оборачиваем его в DataLoader с тем же batch_size
         val_loader = DataLoader(
             val_dataset,
-            batch_size=self.batch_size // 2,  # Используем тот же размер батча, что и при обучении
+            batch_size=2,
             shuffle=False  # Валидацию обычно не перемешивают
         )
 
@@ -84,15 +84,15 @@ class TrainModel:
                 outputs_np = outputs.float().detach().cpu().numpy()
                 hr_imgs_np = hr_imgs.float().detach().cpu().numpy()
                 # Рассчитываем SSIM
-                ssim_val = ssim_skimage(
-                    outputs_np,
-                    hr_imgs_np,
-                    multichannel=True,
-                    channel_axis=-1,
-                    data_range=255,
-                    win_size=3
-                )
-                self.total_ssim += ssim_val
+                # ssim_val = ssim_skimage(
+                #     outputs_np,
+                #     hr_imgs_np,
+                #     multichannel=True,
+                #     channel_axis=-1,
+                #     data_range=255,
+                #     win_size=3
+                # )
+                # self.total_ssim += (ssim_val / 100)
                 count += 1
                 pbar.set_description(
                     f'| AVG PSNR: {total_psnr / count:.4f} | AVG SSIM: {self.total_ssim / count:.4f}')
@@ -140,8 +140,7 @@ class TrainModel:
             hr_dir,
             transform=transform,
             noise_augmenter=noise_augmenter,
-            cnt_im_start=12_000,
-            cnt_im_end=9_666
+            cnt_im_start=12000
         )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         print_center("Add noise for model")
@@ -157,8 +156,6 @@ class TrainModel:
             self.validate_model(save_check=True)
         print(f"max check Best PSNR: {self.best_psnr:.4f}")
         print_center("START Training")
-        day_now: datetime = datetime.datetime.now()
-        print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
         try:
             while self.avg_ssim <= 1.0 or self.check_count <= 10:
                 pbar = tqdm(
@@ -171,6 +168,8 @@ class TrainModel:
                     postfix=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 )
                 scaler = torch.amp.GradScaler('cuda')
+                day_now = datetime.datetime.now()
+                print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
                 for lr_imgs, hr_imgs in pbar:
                     if day_now.day < datetime.datetime.now().day:
                         day_now = datetime.datetime.now()
@@ -188,9 +187,9 @@ class TrainModel:
                         f'| Epoch {self.epoch} | Loss {running_loss / len(dataloader.dataset):.2f}')
                     del lr_imgs, hr_imgs, loss
                     torch.cuda.empty_cache()
-                if self.epoch != 1 and self.epoch % 10 == 0:
-                    self.validate_model()
                 torch.cuda.empty_cache()
+                # if self.epoch != 1 and self.epoch % 10 == 0:
+                self.validate_model()
                 self.epoch += 1
         except KeyboardInterrupt:
             self.validate_model(exit_training=True)
