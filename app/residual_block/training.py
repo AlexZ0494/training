@@ -140,7 +140,7 @@ class TrainModel:
             hr_dir,
             transform=transform,
             noise_augmenter=noise_augmenter,
-            cnt_im_start=12000
+            cnt_im_start=2
         )
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         print_center("Add noise for model")
@@ -152,12 +152,12 @@ class TrainModel:
             noise_str = '\n    '.join([f"{i + 1}. {noise}" for i, noise in enumerate(self.noises)])
         output = f"Noises:\n    {noise_str}"
         print(output)
-        if self.best_psnr > 0:
-            self.validate_model(save_check=True)
-        print(f"max check Best PSNR: {self.best_psnr:.4f}")
+        # if self.best_psnr > 0:
+        #     self.validate_model(save_check=True)
+        # print(f"max check Best PSNR: {self.best_psnr:.4f}")
         print_center("START Training")
         try:
-            while self.avg_ssim <= 1.0 or self.check_count <= 10:
+            # while self.avg_ssim <= 1.0 or self.check_count <= 10:
                 pbar = tqdm(
                     dataloader,
                     unit='batch',
@@ -171,6 +171,7 @@ class TrainModel:
                 day_now = datetime.datetime.now()
                 print(f' {day_now.strftime('%Y-%m-%d %H:%M:%S')} '.center(lcolumn, '-'))
                 for lr_imgs, hr_imgs in pbar:
+                    break
                     if day_now.day < datetime.datetime.now().day:
                         day_now = datetime.datetime.now()
                         print()
